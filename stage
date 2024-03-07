@@ -1,0 +1,31 @@
+#!/bin/bash
+
+default_stage="dev"
+
+# Parse stage
+if [[ $1 == "dev" || $1 == "stg" || $1 == "prd" ]]
+then
+    export TF_VAR_stage=$1
+else
+    export TF_VAR_stage=$default_stage
+fi
+
+# Clear caches
+find ./terragrunt -name '.terraform' -prune -type d -exec rm -rf {} + && echo 'Removed `.terraform` directories'
+find ./terragrunt -name 'terraform.tfstate.d' -prune -exec rm -rf {} + && echo 'Removed `terraform.tfstate.d` files'
+find ./terragrunt -name '.terragrunt-cache' -prune -type d -exec rm -rf {} + && echo 'Removed `.terragrunt-cache` directories'
+find ./terragrunt -name 'backend.copy.tf' -prune -exec rm -rf {} + && echo 'Removed `backend.copy.tf` files'
+find ./terragrunt -name 'providers.copy.tf' -prune -exec rm -rf {} + && echo 'Removed `providers.copy.tf` files'
+
+providers=()
+while IFS=  read -r -d $'\0'; do
+    providers+=("$REPLY")
+done < <(find ./terragrunt -name "providers.tf" -print0)
+for bad_practice in $providers
+do 
+    if [[ $bad_practice != "./terragrunt/providers.tf" ]]; then rm -rf $bad_practice; fi
+done && echo 'Removed `providers.tf` files'
+
+# Show Terraform env vars
+printenv | grep '^TF_'
+printenv | grep '^TERRAGRUNT_'

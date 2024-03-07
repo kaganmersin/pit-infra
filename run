@@ -1,0 +1,456 @@
+#!/bin/bash
+PATH=./node_modules/.bin:$PATH
+
+# Colors
+source ./scripts/colors
+
+# Logging Emblem
+emblem=""
+emblem_info="$emblem$cwht[INFO]$cnorm"
+emblem_warning="$emblem$cbyel[WARNING]$cnorm"
+emblem_error="$emblem$cbred[ERROR]$cnorm"
+emblem_debug="$emblem$cdwht[DEBUG]$cnorm"
+
+# Info
+function info { echo "$emblem_info$cnorm $1$cnorm" ;}
+info_not_yet_implemented=$(info "Not yet implemented.")
+
+# Debug
+function debug { echo "$emblem_debug$cdwht $1$cnorm" ;}
+
+# Warning
+function warning { echo "$emblem_warning$cnorm $1$cnorm"; }
+
+# Error
+function error { echo "$emblem_error$cbwht $1$cnorm"; }
+# error_aws_credentials_missing=$(error "AWS credentials missing!")
+error_stage_must_be_defined=$(error "TF_VAR_stage must be defined!")
+error_working_directory_argument_is_required=$(error "Valid working directory is required!")
+
+function task:clean {
+    echo $(info "Cleaning temporary folders...")
+    find . -name 'node_modules' -prune -type d -exec rm -rf {} + && echo $(debug "Removed 'node_modules' directories")
+    find . -name 'yarn-error.log' -prune -exec rm -rf {} + && echo $(debug "Removed 'yarn-error.log' files")
+    find . -name '.terraform' -prune -type d -exec rm -rf {} + && echo $(debug "Removed '.terraform' directories")
+    find . -name 'terraform.tfstate.d' -prune -exec rm -rf {} + && echo $(debug "Removed 'terraform.tfstate.d' files")
+    find . -name '.terragrunt-cache' -prune -type d -exec rm -rf {} + && echo $(debug "Removed '.terragrunt-cache' directories")
+    find . -name 'backend.copy.tf' -prune -exec rm -rf {} + && echo $(debug "Removed 'backend.copy.tf' files")
+    find . -name 'dist' -prune -type d -exec rm -rf {} + && echo $(debug "Removed 'dist' directories")
+    find . -name '.test-results' -prune -type d -exec rm -rf {} + && echo $(debug "Removed '.test-results' directories")
+}
+
+function task:setup {
+    curl --compressed -o- -L https://yarnpkg.com/install.sh | bash
+}
+
+function task:init {
+    # if [[ -z "$AWS_ACCESS_KEY_ID" ]]
+    # then
+    #     echo $error_aws_credentials_missing
+    #     exit 1
+    if [[ -z "$TF_VAR_stage" ]]
+    then
+        echo $error_stage_must_be_defined
+        exit 1
+    elif [[ -z ${1+x} ]]
+    then
+        echo $error_working_directory_argument_is_required
+        exit 1
+    else
+        # Clear cache foldes
+        echo $(info "Clearing cache folders...")
+        find ./terragrunt/$1 -name '.terraform' -prune -type d -exec rm -rf {} + && echo $(debug "Removed '.terraform' directories")
+        find ./terragrunt/$1 -name 'terraform.tfstate.d' -prune -exec rm -rf {} + && echo $(debug "Removed 'terraform.tfstate.d' files")
+        find ./terragrunt/$1 -name '.terragrunt-cache' -prune -type d -exec rm -rf {} + && echo $(debug "Removed '.terragrunt-cache' directories")
+        find ./terragrunt/$1 -name 'backend.copy.tf' -prune -exec rm -rf {} + && echo $(debug "Removed 'backend.copy.tf' files")
+
+        # Init each folder
+        echo $(info "Module initializing...")
+        eval terragrunt init -reconfigure --terragrunt-working-dir ./terragrunt/$1 2> >(grep -v "\[terragrunt]" >&2)
+        echo $(debug "Module initialized.")
+    fi
+}
+
+function task:init-all {
+    # if [[ -z "$AWS_ACCESS_KEY_ID" ]]
+    # then
+    #     echo $error_aws_credentials_missing
+    #     exit 1
+    if [[ -z "$TF_VAR_stage" ]]
+    then
+        echo $$error_stage_must_be_defined
+        exit 1
+    else
+        # Clear cache foldes
+        echo $(info "Clearing cache folders...")
+        find . -name '.terraform' -prune -type d -exec rm -rf {} + && echo $(debug "Removed '.terraform' directories")
+        find . -name 'terraform.tfstate.d' -prune -exec rm -rf {} + && echo $(debug "Removed 'terraform.tfstate.d' files")
+        find . -name '.terragrunt-cache' -prune -type d -exec rm -rf {} + && echo $(debug "Removed '.terragrunt-cache' directories")
+        find . -name 'backend.copy.tf' -prune -exec rm -rf {} + && echo $(debug "Removed 'backend.copy.tf' files")
+
+        # Init each folder
+        for dirname in $(find ./terragrunt -not -path '*/.terragrunt-cache/*' -type f -name "terragrunt.hcl" -exec dirname {} \;)
+        do
+            if [[ $dirname != './terragrunt' ]]
+            then
+                echo $(info "Module $dirname initializing...")
+
+                if [[ ! -d "$dirname/.terragrunt-cache" ]]
+                then
+                    eval terragrunt init -reconfigure --terragrunt-working-dir $dirname 2> >(grep -v "\[terragrunt]" >&2)
+                    echo $(debug "Module $dirname initialized.")
+                else
+                    echo $(debug "Module $dirname already initialized.")
+                fi
+            fi
+        done
+    fi
+}
+
+function task:build {
+    echo $info_not_yet_implemented
+}
+
+function task:validate {
+    # Ensure stage and credentials are set
+    # if [[ -z "$AWS_ACCESS_KEY_ID" ]]
+    # then
+    #     echo $error_aws_credentials_missing
+    #     exit 1
+    if [[ -z "$TF_VAR_stage" ]]
+    then
+        echo $$error_stage_must_be_defined
+        exit 1
+    elif [[ -z ${1+x} ]]
+    then
+        echo $error_working_directory_argument_is_required
+        exit 1
+    else
+        task:envs
+        terragrunt validate --terragrunt-working-dir ./terragrunt/$1 --terragrunt-non-interactive 2> >(grep -v "\[terragrunt]" >&2)
+    fi
+}
+
+function task:validate-all {
+    # Ensure stage and credentials are set
+    # if [[ -z "$AWS_ACCESS_KEY_ID" ]]
+    # then
+    #     echo $error_aws_credentials_missing
+    #     exit 1
+    if [[ -z "$TF_VAR_stage" ]]
+    then
+        echo $$error_stage_must_be_defined
+        exit 1
+    elif [[ -z ${1+x} ]]
+    then
+        task:envs
+        terragrunt validate-all --terragrunt-working-dir ./terragrunt --terragrunt-no-auto-init --terragrunt-non-interactive 2> >(grep -v "\[terragrunt]" >&2)
+    else
+        task:envs
+        terragrunt validate-all --terragrunt-working-dir ./terragrunt/$1 --terragrunt-no-auto-init --terragrunt-non-interactive 2> >(grep -v "\[terragrunt]" >&2)
+    fi
+}
+function task:fmt {
+    # Ensure stage and credentials are set
+    # if [[ -z ${1+x} ]]
+    # then
+    #     echo $error_working_directory_argument_is_required
+    #     exit 1
+    # else
+    task:envs
+    exec 6> >(grep -v "\[terragrunt]") >&2
+    if [ $# -ge 2 -a "$2" = "-V" ]; then
+        echo $(info "Verbose mode enabled")
+        exec 6>&1
+    elif [ $# -ge 2 -a "$2" = "-D" ]; then
+        echo $(info "Debug mode enabled")
+        export TF_LOG="debug"
+        export TERRAGRUNT_DEBUG="true"
+        exec 6>&1
+    fi
+    terraform fmt -recursive ./terragrunt/$1 >&6 2>&1
+    terragrunt hclfmt --terragrunt-working-dir ./terragrunt/$1 >&6 2>&1
+    # fi
+}
+
+function task:lint {
+    # Ensure stage and credentials are set
+    if [[ -z ${1+x} ]]
+    then
+        echo $error_working_directory_argument_is_required
+        exit 1
+    else
+        task:envs
+        exec 6> >(grep -v "\[terragrunt]") >&2
+        if [ $# -ge 2 -a "$2" = "-V" ]; then
+            echo $(info "Verbose mode enabled")
+            exec 6>&1
+        elif [ $# -ge 2 -a "$2" = "-D" ]; then
+            echo $(info "Debug mode enabled")
+            export TF_LOG="debug"
+            export TERRAGRUNT_DEBUG="true"
+            exec 6>&1
+        fi
+        terraform fmt -check -recursive ./terragrunt/$1 >&6 2>&1
+        terragrunt hclfmt --terragrunt-check --terragrunt-working-dir ./terragrunt/$1 >&6 2>&1
+    fi
+}
+
+
+function task:plan {
+    # Ensure stage and credentials are set
+    # if [[ -z "$AWS_ACCESS_KEY_ID" ]]
+    # then
+    #     echo $error_aws_credentials_missing
+    #     exit 1
+    if [[ -z "$TF_VAR_stage" ]]
+    then
+        echo $$error_stage_must_be_defined
+        exit 1
+    elif [[ -z ${1+x} ]]
+    then
+        echo $error_working_directory_argument_is_required
+        exit 1
+    else
+        task:envs
+        exec 6> >(grep -v "\[terragrunt]") >&2
+        if [ $# -ge 2 -a "$2" = "-V" ]; then
+            echo $(info "Verbose mode enabled")
+            exec 6>&1
+        elif [ $# -ge 2 -a "$2" = "-D" ]; then
+            echo $(info "Debug mode enabled")
+            export TF_LOG="debug"
+            export TERRAGRUNT_DEBUG="true"
+            exec 6>&1
+        fi
+        terragrunt apply --terragrunt-working-dir ./terragrunt/$1 >&6 2>&1
+    fi
+}
+
+function task:plan-all {
+    # Ensure stage and credentials are set
+    # if [[ -z "$AWS_ACCESS_KEY_ID" ]]
+    # then
+    #     echo $error_aws_credentials_missing
+    #     exit 1
+    if [[ -z "$TF_VAR_stage" ]]
+    then
+        echo $$error_stage_must_be_defined
+        exit 1
+    elif [[ -z ${1+x} ]]
+    then
+        task:envs
+        terragrunt plan-all --terragrunt-working-dir ./terragrunt --terragrunt-no-auto-init --terragrunt-non-interactive 2> >(grep -v "\[terragrunt]" >&2)
+    else
+        task:envs
+        terragrunt plan-all --terragrunt-working-dir ./terragrunt/$1 --terragrunt-non-interactive 2> >(grep -v "\[terragrunt]" >&2)
+    fi
+}
+
+function task:apply {
+    # Ensure stage and credentials are set
+    # if [[ -z "$AWS_ACCESS_KEY_ID" ]]
+    # then
+    #     echo $error_aws_credentials_missing
+    #     exit 1
+    if [[ -z "$TF_VAR_stage" ]]
+    then
+        echo $$error_stage_must_be_defined
+        exit 1
+    elif [[ -z ${1+x} ]]
+    then
+        echo $error_working_directory_argument_is_required
+        exit 1
+    else
+        task:envs
+        terragrunt apply --terragrunt-working-dir ./terragrunt/$1 --terragrunt-non-interactive 2> >(grep -v "\[terragrunt]" >&2)
+    fi
+}
+
+function task:apply-all {
+    # Ensure stage and credentials are set
+    # if [[ -z "$AWS_ACCESS_KEY_ID" ]]
+    # then
+    #     echo $error_aws_credentials_missing
+    #     exit 1
+    if [[ -z "$TF_VAR_stage" ]]
+    then
+        echo $$error_stage_must_be_defined
+        exit 1
+    elif [[ -z ${1+x} ]]
+    then
+        task:envs
+        terragrunt apply-all --terragrunt-working-dir ./terragrunt --terragrunt-no-auto-init --terragrunt-non-interactive 2> >(grep -v "\[terragrunt]" >&2)
+    else
+        task:envs
+        terragrunt apply-all --terragrunt-working-dir ./terragrunt/$1 --terragrunt-non-interactive 2> >(grep -v "\[terragrunt]" >&2)
+    fi
+}
+
+function task:output {
+    # Ensure stage and credentials are set
+    # if [[ -z "$AWS_ACCESS_KEY_ID" ]]
+    # then
+    #     echo $error_aws_credentials_missing
+    #     exit 1
+    if [[ -z "$TF_VAR_stage" ]]
+    then
+        echo $$error_stage_must_be_defined
+        exit 1
+    elif [[ -z ${1+x} ]]
+    then
+        echo $error_working_directory_argument_is_required
+        exit 1
+    else
+        task:envs
+        terragrunt output --terragrunt-working-dir ./terragrunt/$1 --terragrunt-non-interactive 2> >(grep -v "\[terragrunt]" >&2)
+    fi
+}
+
+function task:output-all {
+    # Ensure stage and credentials are set
+    # if [[ -z "$AWS_ACCESS_KEY_ID" ]]
+    # then
+    #     echo $error_aws_credentials_missing
+    #     exit 1
+    if [[ -z "$TF_VAR_stage" ]]
+    then
+        echo $$error_stage_must_be_defined
+        exit 1
+    elif [[ -z ${1+x} ]]
+    then
+        task:envs
+        terragrunt output-all --terragrunt-working-dir ./terragrunt --terragrunt-no-auto-init --terragrunt-non-interactive 2> >(grep -v "\[terragrunt]" >&2)
+    else
+        task:envs
+        terragrunt output-all --terragrunt-working-dir ./terragrunt/$1 --terragrunt-no-auto-init --terragrunt-non-interactive 2> >(grep -v "\[terragrunt]" >&2)
+    fi
+}
+
+function task:destroy {
+    # Ensure stage and credentials are set
+    # if [[ -z "$AWS_ACCESS_KEY_ID" ]]
+    # then
+    #     echo $error_aws_credentials_missing
+    #     exit 1
+    if [[ -z "$TF_VAR_stage" ]]
+    then
+        echo $$error_stage_must_be_defined
+        exit 1
+    elif [[ -z ${1+x} ]]
+    then
+        echo $error_working_directory_argument_is_required
+        exit 1
+    else
+        task:envs
+        terragrunt destroy --terragrunt-working-dir ./terragrunt/$1 2> >(grep -v "\[terragrunt]" >&2)
+    fi
+}
+
+function task:destroy-all {
+    # Ensure stage and credentials are set
+    # if [[ -z "$AWS_ACCESS_KEY_ID" ]]
+    # then
+    #     echo $error_aws_credentials_missing
+    #     exit 1
+    if [[ -z "$TF_VAR_stage" ]]
+    then
+        echo $$error_stage_must_be_defined
+        exit 1
+    elif [[ -z ${1+x} ]]
+    then
+        task:envs
+        terragrunt destroy-all --terragrunt-working-dir ./terragrunt --terragrunt-no-auto-init --terragrunt-non-interactive 2> >(grep -v "\[terragrunt]" >&2)
+    else
+        task:envs
+        terragrunt destroy-all --terragrunt-working-dir ./terragrunt/$1 --terragrunt-no-auto-init --terragrunt-non-interactive 2> >(grep -v "\[terragrunt]" >&2)
+    fi
+}
+
+function task:tg {
+    # Ensure stage and credentials are set
+    # if [[ -z "$AWS_ACCESS_KEY_ID" ]]
+    # then
+    #     echo $error_aws_credentials_missing
+    #     exit 1
+    if [[ -z "$TF_VAR_stage" ]]
+    then
+        echo $$error_stage_must_be_defined
+        exit 1
+    else
+        # Get option-arguments
+        while getopts :hvDI opt; do
+            case "$opt" in
+                h|\?)
+                    terragrunt -h >&2
+                    exit 0 ;;
+                v)
+                    terragrunt -v >&2
+                    exit 0 ;;
+                D)
+                    export TF_LOG="debug"
+                    export TERRAGRUNT_DEBUG="true"
+                    ;;
+                I)
+                    opt_no_auto_init=" --terragrunt-no-auto-init" ;;
+                :)
+                    # if [[ $OPTARG == "d" ]]
+                    # then
+                    #     echo $(error "-$OPTARG requires a working directory!") >&2
+                    # else
+                        echo $(error "Option -$OPTARG requires an argument.") >&2
+                    # fi
+                    exit 1 ;;
+            esac
+        done
+        shift $(($OPTIND - 1))
+
+        if [[ -z ${1+x} || -z ${2+x} || ! -d "./terragrunt/$1" ]]
+        then
+            echo $error_working_directory_argument_is_required
+            exit 1
+        else
+            task:envs
+            echo $(debug "terragrunt ${*/#$1} --terragrunt-working-dir ./terragrunt/$1 $opt_no_auto_init")
+            terragrunt ${*/#$1} --terragrunt-working-dir ./terragrunt/$1 $opt_no_auto_init
+        fi
+    fi
+}
+
+function task:install_deps {
+    # Terraform Plugin: https://github.com/Mastercard/terraform-provider-restapi
+    terraform_provider_restapi_version="${1:-v1.9.3}"
+    # wget --no-check-certificate --content-disposition https://github.com/Mastercard/terraform-provider-restapi/$terraform_provider_restapi_version
+    # --no-check-cerftificate was necessary for me to have wget not puke about https
+    if [[ ! -d "~/.terraform.d/plugins" ]]
+    then
+        mkdir ~/.terraform.d/plugins
+    fi
+
+    cd ~/.terraform.d/plugins
+
+    # MacOS
+    rm -f terraform-provider-restapi_${terraform_provider_restapi_version}-darwin-amd64
+    curl -LJO https://github.com/Mastercard/terraform-provider-restapi/releases/download/${terraform_provider_restapi_version}/terraform-provider-restapi_${terraform_provider_restapi_version}-darwin-amd64
+    chmod +x terraform-provider-restapi_${terraform_provider_restapi_version}-darwin-amd64
+}
+
+function task:envs {
+    printenv | grep '^USER'
+    printenv | grep '^HOME'
+    printenv | grep '^PWD'
+    printenv | grep '^AWS_' | grep -v -e 'SECRET' | grep -v -e 'TOKEN' | grep -v -e 'PASSWORD'
+    printenv | grep '^TF_'
+    printenv | grep '^TERRAGRUNT_'
+    printenv | grep '^NODE_'
+    printenv | grep '^NVM_'
+}
+
+function task:default {
+    echo "$ ./run <task> <args>"
+    echo "Tasks:"
+    compgen -A function | sed -En 's/task:(.*)/\1/p' | cat -n
+}
+
+TIMEFORMAT="⏱  Task completed in %3lR"
+time "task:${@:-default}"
