@@ -5,8 +5,7 @@
 # ----------------------------------------------------------------------------------------------------------------------
 
 module "azure_region" {
-  # source       = "git::git@github.com:kaganmersin/pit-infra.git//modules/regions?ref=0.1.0"
-  source       = "./modules/regions"
+  source       = "git::git@github.com:kaganmersin/pit-infra.git//modules/regions?ref=feat/initial-modules"
   azure_region = var.az_region
 }
 # ----------------------------------------------------------------------------------------------------------------------

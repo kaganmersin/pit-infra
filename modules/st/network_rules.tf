@@ -19,7 +19,7 @@ locals {
 module "private_endpoint" {
   for_each = local.private_endpoint_map
 
-  source     = "../pep"
+  source     = "git::git@github.com:kaganmersin/pit-infra.git//modules/pep?ref=feat/initial-modules"
   depends_on = [azurerm_storage_account.default]
 
   az_region            = var.az_region
