@@ -1,12 +1,6 @@
 locals {
   location_slug = lookup(zipmap(values(local.regions), keys(local.regions)), var.azure_region, lookup(zipmap(values(local.location_slug), keys(local.location_slug)), var.azure_region, var.azure_region))
-  #location_slug = lookup(local.short_names, var.azure_region, var.azure_region)
-  # location_slug = coalesce(
-  #   local.short_names[var.azure_region], // Try short name lookup first
-  #   var.azure_region,                    // Then try direct match
-  #   lookup(local.regions, var.azure_region, null) // Finally try standard format
-  # )
-  # Azure region mapping between slug and standard format.
+
 
   regions = {
     us-west          = "West US"
