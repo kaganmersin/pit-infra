@@ -1,5 +1,5 @@
 locals {
-  location_slug = lookup(zipmap(values(local.regions), keys(local.regions)), var.azure_region, lookup(zipmap(values(local.location_slug), keys(local.location_slug)), var.azure_region, var.azure_region))
+  location_slug = lookup(zipmap(values(local.regions), keys(local.regions)), var.azure_region, lookup(zipmap(values(local.short_names), keys(local.short_names)), var.azure_region, var.azure_region))
 
 
   regions = {
