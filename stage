@@ -16,6 +16,7 @@ find ./terragrunt -name 'terraform.tfstate.d' -prune -exec rm -rf {} + && echo '
 find ./terragrunt -name '.terragrunt-cache' -prune -type d -exec rm -rf {} + && echo 'Removed `.terragrunt-cache` directories'
 find ./terragrunt -name 'backend.copy.tf' -prune -exec rm -rf {} + && echo 'Removed `backend.copy.tf` files'
 find ./terragrunt -name 'providers.copy.tf' -prune -exec rm -rf {} + && echo 'Removed `providers.copy.tf` files'
+find ./terragrunt -name '.terraform.lock.hcl' -prune -exec rm -rf {} + && echo 'Removed `.terraform.lock.hcl` files'
 
 providers=()
 while IFS=  read -r -d $'\0'; do

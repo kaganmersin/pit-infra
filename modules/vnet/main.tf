@@ -16,7 +16,7 @@ resource "azurerm_virtual_network" "default" {
   name                = join(var.delimiter, compact([local.stage_prefix, var.application, module.azure_region.location_short, each.value.prefix, "vnet"]))
   resource_group_name = var.resource_group_name
   address_space       = coalesce(compact([each.value.vnet_cidr_block]))
-  location            = var.az_region
+  location            = module.azure_region.location_cli
   bgp_community       = each.value.bgp_community == null ? null : join(":", ["12076", each.value.bgp_community])
 
   dynamic "ddos_protection_plan" {

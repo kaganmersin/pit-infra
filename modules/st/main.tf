@@ -19,7 +19,7 @@ resource "azurerm_storage_account" "default" {
 
   account_replication_type          = each.value.account_replication_type
   account_tier                      = each.value.account_tier
-  location                          = var.az_region
+  location                          = module.azure_region.location_cli
   name                              = replace(join("", [local.stage_prefix, var.application, module.azure_region.location_short, each.value.prefix, var.name]), "-", "")
   resource_group_name               = var.resource_group_name
   access_tier                       = each.value.access_tier

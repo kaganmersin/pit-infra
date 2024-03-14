@@ -38,3 +38,11 @@ EOD
   }
 }
 
+output "location_slug_debug" {
+  value = local.location_slug
+}
+
+output "short_names_keys_debug" {
+  value = keys(local.short_names)
+}
+

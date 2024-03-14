@@ -17,7 +17,7 @@ module "azure_region" {
 resource "azurerm_resource_group" "default" {
   for_each = var.create ? var.resource_groups : {}
   name     = join(var.delimiter, compact([local.stage_prefix, var.application, module.azure_region.location_short, each.value.prefix, var.name]))
-  location = var.az_region
+  location = module.azure_region.location_cli
   tags     = local.tags
 }
 

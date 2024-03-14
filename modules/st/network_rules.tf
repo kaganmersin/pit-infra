@@ -22,7 +22,7 @@ module "private_endpoint" {
   source     = "git::git@github.com:kaganmersin/pit-infra.git//modules/pep?ref=feat/initial-modules"
   depends_on = [azurerm_storage_account.default]
 
-  az_region            = var.az_region
+  az_region            = module.azure_region.location_cli
   resource_group_name  = var.resource_group_name
   target_resource      = azurerm_storage_account.default[each.value.st_key].id
   subnet_id            = each.value.subnet_id

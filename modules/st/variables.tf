@@ -119,7 +119,7 @@ locals {
     stage      = var.stage
     module     = var.name
     repository = var.repository
-    region     = var.az_region
+    region     = module.azure_region.location_cli
   }
   automation_tags = {
     terraform_module = var.terraform_module
