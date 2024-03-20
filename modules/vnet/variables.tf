@@ -77,7 +77,7 @@ variable "tags" {
 
 variable "desc_prefix" {
   type        = string
-  default     = "PetInsurance:"
+  default     = "Pi:"
   description = "The prefix to add to any descriptions attached to resources"
 }
 

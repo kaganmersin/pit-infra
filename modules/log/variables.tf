@@ -2,16 +2,15 @@
 # Module Standard Variables
 # ----------------------------------------------------------------------------------------------------------------------
 
-
 variable "name" {
   type        = string
-  default     = "diagnostic"
+  default     = "log"
   description = "The name of the module"
 }
 
 variable "terraform_module" {
   type        = string
-  default     = "kaganmersin/pit-infra/modules/diagnostic"
+  default     = "kaganmersin/pit-infra/modules/log"
   description = "The owner and name of the Terraform module"
 }
 
@@ -19,6 +18,12 @@ variable "az_region" {
   type        = string
   default     = ""
   description = "The Azure region to deploy module into"
+}
+
+variable "resource_group_name" {
+  type        = string
+  default     = ""
+  description = "The name of the Azure resource group"
 }
 
 variable "create" {
@@ -36,7 +41,7 @@ variable "create" {
 variable "namespace" {
   type        = string
   default     = ""
-  description = "Namespace, which could be your organization abbreviation, client name, etc. (e.g. Pet Insurance 'pit', HashiCorp 'hc')"
+  description = "Namespace, which could be your organization abbreviation, client name, etc. (e.g. Pet-Insurance 'pit', HashiCorp 'hc')"
 }
 
 variable "environment" {
@@ -92,13 +97,13 @@ variable "stage_prefix" {
 variable "module_prefix" {
   type        = string
   default     = ""
-  description = "Concatenation of `namespace`, `environment`, `stage`, `application`, `region` and `name`"
+  description = "Concatenation of `namespace`, `environment`, `stage` and `name`"
 }
 
 variable "delimiter" {
   type        = string
   default     = "-"
-  description = "Delimiter to be used between `namespace`, `environment`, `stage`, `application`, `region` and `name`"
+  description = "Delimiter to be used between `namespace`, `environment`, `stage`, `name`"
 }
 
 locals {
@@ -135,81 +140,48 @@ locals {
 
 
 # ----------------------------------------------------------------------------------------------------------------------
-# Module Variables
+# Module variables
 # ----------------------------------------------------------------------------------------------------------------------
 
+variable "log_analytics_workspaces" {
+  type = map(object({
+    security_center_workspace          = optional(bool)
+    contributors                       = optional(list(string), [])
+    allow_resource_only_permissions    = optional(bool)
+    local_authentication_disabled      = optional(bool)
+    sku                                = optional(string)
+    retention_in_days                  = optional(number)
+    daily_quota_gb                     = optional(number)
+    cmk_for_query_forced               = optional(bool)
+    internet_ingestion_enabled         = optional(bool)
+    internet_query_enabled             = optional(bool)
+    reservation_capacity_in_gb_per_day = optional(number)
+    solutions = optional(list(object({
+      solution_name = string
+      publisher     = string
+      product       = string
+    })))
+    timeouts = optional(object({
+      create = optional(string)
+      update = optional(string)
+      read   = optional(string)
+      delete = optional(string)
+    }))
+  }))
+  default = {}
+}
 
 locals {
-  enabled = length(var.logs_destinations_ids) > 0
+  workspace_map = var.log_analytics_workspaces
 
-  log_categories = [
-    for log in
-    (
-      var.log_categories != null ?
-      var.log_categories :
-      try(data.azurerm_monitor_diagnostic_categories.default.log_category_types, [])
-    ) : log if !contains(var.excluded_log_categories, log)
+  role_assignments = [
+    for ws_key, ws in local.workspace_map :
+    [for principal_id in ws.contributors : {
+      key          = ws_key
+      principal_id = principal_id
+    }]
   ]
 
-  metric_categories = (
-    var.metric_categories != null ?
-    var.metric_categories :
-    try(data.azurerm_monitor_diagnostic_categories.default.metrics, [])
-  )
-
-  metrics = {
-    for metric in try(data.azurerm_monitor_diagnostic_categories.default.metrics, []) : metric => {
-      enabled = contains(local.metric_categories, metric)
-    }
-  }
-
-  storage_id       = coalescelist([for r in var.logs_destinations_ids : r if contains(split("/", lower(r)), "microsoft.storage")], [null])[0]
-  log_analytics_id = coalescelist([for r in var.logs_destinations_ids : r if contains(split("/", lower(r)), "microsoft.operationalinsights")], [null])[0]
-
-  eventhub_authorization_rule_id = coalescelist([for r in var.logs_destinations_ids : split("|", r)[0] if contains(split("/", lower(r)), "microsoft.eventhub")], [null])[0]
-  eventhub_name                  = coalescelist([for r in var.logs_destinations_ids : try(split("|", r)[1], null) if contains(split("/", lower(r)), "microsoft.eventhub")], [null])[0]
-
-  log_analytics_destination_type = local.log_analytics_id != null ? var.log_analytics_destination_type : null
-}
-
-
-
-variable "target_resource_id" {
-  description = "Resource ID of the actual resource that log categories will be enabled of"
-  type        = string
-}
-
-variable "logs_destinations_ids" {
-  type        = list(string)
-  nullable    = false
-  description = <<EOD
-List of destination resources IDs for logs diagnostic destination.
-Can be `Storage Account`, `Log Analytics Workspace` and `Event Hub`. No more than one of each can be set.
-If you want to use Azure EventHub as destination, you must provide a formatted string with both the EventHub Namespace authorization send ID and the EventHub name (name of the queue to use in the Namespace) separated by the <code>&#124;</code> character.
-EOD
-}
-
-variable "log_analytics_destination_type" {
-  type        = string
-  default     = "AzureDiagnostics"
-  description = "When set to 'Dedicated' logs sent to a Log Analytics workspace will go into resource specific tables, instead of the legacy AzureDiagnostics table."
-}
-
-variable "log_categories" {
-  type        = list(string)
-  default     = null
-  description = "List of log categories. Defaults to all available."
-}
-
-variable "excluded_log_categories" {
-  type        = list(string)
-  default     = []
-  description = "List of log categories to exclude."
-}
-
-variable "metric_categories" {
-  type        = list(string)
-  default     = null
-  description = "List of metric categories. Defaults to all available."
+  flat_role_assignments = flatten(local.role_assignments)
 }
 

@@ -2,16 +2,15 @@
 # Module Standard Variables
 # ----------------------------------------------------------------------------------------------------------------------
 
-
 variable "name" {
   type        = string
-  default     = "diagnostic"
+  default     = "asp"
   description = "The name of the module"
 }
 
 variable "terraform_module" {
   type        = string
-  default     = "kaganmersin/pit-infra/modules/diagnostic"
+  default     = "kaganmersin/pit-infra/modules/asp"
   description = "The owner and name of the Terraform module"
 }
 
@@ -19,6 +18,12 @@ variable "az_region" {
   type        = string
   default     = ""
   description = "The Azure region to deploy module into"
+}
+
+variable "resource_group_name" {
+  type        = string
+  default     = ""
+  description = "The name of the Azure resource group"
 }
 
 variable "create" {
@@ -36,7 +41,7 @@ variable "create" {
 variable "namespace" {
   type        = string
   default     = ""
-  description = "Namespace, which could be your organization abbreviation, client name, etc. (e.g. Pet Insurance 'pit', HashiCorp 'hc')"
+  description = "Namespace, which could be your organization abbreviation, client name, etc. (e.g. Pet-Insurance 'pit', HashiCorp 'hc')"
 }
 
 variable "environment" {
@@ -92,13 +97,13 @@ variable "stage_prefix" {
 variable "module_prefix" {
   type        = string
   default     = ""
-  description = "Concatenation of `namespace`, `environment`, `stage`, `application`, `region` and `name`"
+  description = "Concatenation of `namespace`, `environment`, `stage` and `name`"
 }
 
 variable "delimiter" {
   type        = string
   default     = "-"
-  description = "Delimiter to be used between `namespace`, `environment`, `stage`, `application`, `region` and `name`"
+  description = "Delimiter to be used between `namespace`, `environment`, `stage`, `name`"
 }
 
 locals {
@@ -135,81 +140,67 @@ locals {
 
 
 # ----------------------------------------------------------------------------------------------------------------------
-# Module Variables
+# Module variables
 # ----------------------------------------------------------------------------------------------------------------------
 
-
-locals {
-  enabled = length(var.logs_destinations_ids) > 0
-
-  log_categories = [
-    for log in
-    (
-      var.log_categories != null ?
-      var.log_categories :
-      try(data.azurerm_monitor_diagnostic_categories.default.log_category_types, [])
-    ) : log if !contains(var.excluded_log_categories, log)
-  ]
-
-  metric_categories = (
-    var.metric_categories != null ?
-    var.metric_categories :
-    try(data.azurerm_monitor_diagnostic_categories.default.metrics, [])
-  )
-
-  metrics = {
-    for metric in try(data.azurerm_monitor_diagnostic_categories.default.metrics, []) : metric => {
-      enabled = contains(local.metric_categories, metric)
-    }
-  }
-
-  storage_id       = coalescelist([for r in var.logs_destinations_ids : r if contains(split("/", lower(r)), "microsoft.storage")], [null])[0]
-  log_analytics_id = coalescelist([for r in var.logs_destinations_ids : r if contains(split("/", lower(r)), "microsoft.operationalinsights")], [null])[0]
-
-  eventhub_authorization_rule_id = coalescelist([for r in var.logs_destinations_ids : split("|", r)[0] if contains(split("/", lower(r)), "microsoft.eventhub")], [null])[0]
-  eventhub_name                  = coalescelist([for r in var.logs_destinations_ids : try(split("|", r)[1], null) if contains(split("/", lower(r)), "microsoft.eventhub")], [null])[0]
-
-  log_analytics_destination_type = local.log_analytics_id != null ? var.log_analytics_destination_type : null
+variable "prefix" {
+  type        = string
+  default     = null
+  description = "The prefix to add to the name of the resources"
 }
 
-
-
-variable "target_resource_id" {
-  description = "Resource ID of the actual resource that log categories will be enabled of"
+variable "os_type" {
+  description = "The O/S type for the App Services to be hosted in this plan. Possible values include `Windows`, `Linux`, and `WindowsContainer`."
   type        = string
+
+  validation {
+    condition     = try(contains(["Windows", "Linux", "WindowsContainer"], var.os_type), true)
+    error_message = "The `os_type` value must be valid. Possible values are `Windows`, `Linux`, and `WindowsContainer`."
+  }
+}
+
+variable "sku_name" {
+  description = "The SKU for the plan. Possible values include B1, B2, B3, D1, F1, FREE, I1, I2, I3, I1v2, I2v2, I3v2, P1v2, P2v2, P3v2, P0v3, P1v3, P2v3, P3v3, S1, S2, S3, SHARED, Y1, EP1, EP2, EP3, WS1, WS2, and WS3."
+  type        = string
+
+  validation {
+    condition     = try(contains(["B1", "B2", "B3", "D1", "F1", "FREE", "I1", "I2", "I3", "I1v2", "I2v2", "I3v2", "P1v2", "P2v2", "P3v2", "P0v3", "P1v3", "P2v3", "P3v3", "S1", "S2", "S3", "SHARED", "Y1", "EP1", "EP2", "EP3", "WS1", "WS2", "WS3"], var.sku_name), true)
+    error_message = "The `sku_name` value must be valid. Possible values include B1, B2, B3, D1, F1, FREE, I1, I2, I3, I1v2, I2v2, I3v2, P1v2, P2v2, P3v2, P0v3, P1v3, P2v3, P3v3, S1, S2, S3, SHARED, Y1, EP1, EP2, EP3, WS1, WS2, and WS3."
+  }
+}
+
+variable "app_service_environment_id" {
+  description = "The ID of the App Service Environment to create this Service Plan in. Requires an Isolated SKU. Use one of I1, I2, I3 for azurerm_app_service_environment, or I1v2, I2v2, I3v2 for azurerm_app_service_environment_v3"
+  type        = string
+  default     = null
+}
+
+variable "worker_count" {
+  description = "The number of Workers (instances) to be allocated."
+  type        = number
+  default     = 3
+}
+
+variable "maximum_elastic_worker_count" {
+  description = "The maximum number of workers to use in an Elastic SKU Plan. Cannot be set unless using an Elastic SKU."
+  type        = number
+  default     = null
+}
+
+variable "per_site_scaling_enabled" {
+  description = "Should Per Site Scaling be enabled."
+  type        = bool
+  default     = false
+}
+
+variable "zone_balancing_enabled" {
+  description = "Should the Service Plan balance across Availability Zones in the region."
+  type        = bool
+  default     = true
 }
 
 variable "logs_destinations_ids" {
   type        = list(string)
-  nullable    = false
-  description = <<EOD
-List of destination resources IDs for logs diagnostic destination.
-Can be `Storage Account`, `Log Analytics Workspace` and `Event Hub`. No more than one of each can be set.
-If you want to use Azure EventHub as destination, you must provide a formatted string with both the EventHub Namespace authorization send ID and the EventHub name (name of the queue to use in the Namespace) separated by the <code>&#124;</code> character.
-EOD
-}
-
-variable "log_analytics_destination_type" {
-  type        = string
-  default     = "AzureDiagnostics"
-  description = "When set to 'Dedicated' logs sent to a Log Analytics workspace will go into resource specific tables, instead of the legacy AzureDiagnostics table."
-}
-
-variable "log_categories" {
-  type        = list(string)
-  default     = null
-  description = "List of log categories. Defaults to all available."
-}
-
-variable "excluded_log_categories" {
-  type        = list(string)
   default     = []
-  description = "List of log categories to exclude."
+  description = "List of destination resources IDs for logs diagnostic destination."
 }
-
-variable "metric_categories" {
-  type        = list(string)
-  default     = null
-  description = "List of metric categories. Defaults to all available."
-}
-

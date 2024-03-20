@@ -1,0 +1,49 @@
+tasks:
+1. check document for missing attributes
+
+
+Missing in general; 
+client_certificate_mode
+client_certificate_exclusion_paths
+ftp_publish_basic_authentication_enabled
+key_vault_reference_identity_id
+webdeploy_publish_basic_authentication_enabled
+zip_deploy_file
+------------------------------------------------
+site_config block 
+
+Missing;
+api_definition_url
+api_management_api_id
+auto_heal_enabled
+container_registry_managed_identity_client_id
+container_registry_use_managed_identity
+health_check_eviction_time_in_min
+ip_restriction_default_action
+load_balancing_mode
+scm_ip_restriction_default_action
+worker_count
+docker_image_name
+docker_registry_url
+docker_registry_username
+docker_registry_password
+docker_container_name
+docker_container_tag
+auto_heal_setting: action and trigger
+description ( in  ip_restriction )
+description ( in  scm_ip_restriction )
+virtual_application block
+
+------------------------------------------------
+
+auth_settings will be merged with any
+
+------------------------------------------------
+done: auth_settings_v2
+
+allowed_audiences missing in active_directory_v2 -- fixed
+------------------------------------------------
+
+
+azurerm_windows_web_app_slot
+service_plan_id
